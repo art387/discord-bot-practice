@@ -8,7 +8,7 @@ class AppUtil:
 
     def __init__(self):
         self.dir_path = os.getcwd()
-        self.dir_lib = os.path.join(self.dir_path, 'lib', 'youtube-dl')
+        self.dir_lib = os.path.join(self.dir_path, 'library_tool', 'youtube-dl')
         self.dir_download = app.app_tool.get_download_path()
 
     def getAudio(self, url):
