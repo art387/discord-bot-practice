@@ -1,6 +1,8 @@
 import json
 
-import discord
+import discord, asyncio, time
+from todoist import TodoistAPI
+
 from app import app_downloader, app_tool, app_todoist
 import database_config as cfg
 import logging
@@ -13,55 +15,68 @@ if cfg.is_logging:
     handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
     logger.addHandler(handler)
 
+client = discord.Client()
+current_task = []
+
+
+def update_log(message):
+    try:
+        with open("bot_log.txt", "a") as f:
+            f.write(f"Time: {int(time.time())}, Author: {message.author} Messages: {message.content}\n")
+    except Exception as e:
+        print(e)
+
 
 @client.event
 async def on_message(message):
+
     if message.author.id != cfg.YOUR_USER_ID and message.author.id != cfg.YOUR_CLIENT_BOT_ID:
         print("Boo someone is hacking")
         return
+    else:
+        update_log(message)
 
     if message.content.find("asu") != -1:
         await message.channel.send("asu")  # If the user says !hello we will send back hi
 
     if message.content.startswith("!audio-dl"):
         client_app = client_downloader
-        try:
-            client_app.getAudio(app_tool.get_url_from_message(message))
-            await message.channel.send('Download is complete O.o')
-        except:
-            await message.channel.send('Something is wrong')
+        client_app.getAudio(app_tool.get_url_from_message(message))
+        await message.channel.send('Download is complete O.o')
 
     if message.content.startswith("!video-dl"):
         client_app = client_downloader
-        try:
-            client_app.getVideo(app_tool.get_url_from_message(message))
-            await message.channel.send('Download is complete o.O')
-        except:
-            await message.channel.send('Something is wrong')
+        client_app.getVideo(app_tool.get_url_from_message(message))
+        await message.channel.send('Download is complete o.O')
 
     if message.content.startswith("!todo all"):
         client_app = client_todoist
-        try:
-            tasks_all = client_app.getAllTask()
-            await message.channel.send(
-                "\n".join(["{}. {}".format(i, task['content']) for i, task in enumerate(tasks_all)]))
-        except:
-            await message.channel.send('failed')
+        tasks = client_app.getAllTask()
+        await message.channel.send(
+            "\n".join(["{}. {}".format(i+1, task['content']) for i, task in enumerate(tasks)]))
 
     if message.content.startswith("!todo today"):
         client_app = client_todoist
-        tasks_today = client_app.getTodayTask()
+        tasks = client_app.getTodayTask()
         await message.channel.send(
-            "\n".join(["{}. {}".format(i, task['content']) for i, task in enumerate(tasks_today)]))
+            "\n".join(["{}. {}".format(i+1, task['content']) for i, task in enumerate(tasks)]))
 
     if message.content.startswith("!todo future"):
         client_app = client_todoist
-        tasks_future = client_app.getFutureTask()
+        tasks = client_app.getFutureTask()
         await message.channel.send(
-            "\n".join(["{}. {}".format(i, task['content']) for i, task in enumerate(tasks_future)]))
+            "\n".join(["{}. {}".format(i+1, task['content']) for i, task in enumerate(tasks)]))
+
+    if message.content.startswith("!todo do"):
+        id_content = message.content[-1]-1
+        client_app = client_todoist
+        response = client_app.setTaskComplete(id_content)
+        await message.channel.send(response + '\n')
+        tasks = client_app.getTodayTask()
+        await message.channel.send(
+            "\n".join(["{}. {}".format(i+1, task['content']) for i, task in enumerate(tasks)]))
 
 
-client_todoist = app_todoist.todoist_app(cfg.YOUR_TODOIST_TOKEN)
+client_todoist = app_todoist.todoist_app(cfg.YOUR_TODOIST_TOKEN, current_task)
 client_downloader = app_downloader.AppUtil()
-client = discord.Client()
 client.run(cfg.YOUR_DISCORD_TOKEN)

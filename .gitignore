@@ -1,6 +1,7 @@
 # my file
 database_config.py
 library_tool/
+bot_log.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
