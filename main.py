@@ -13,8 +13,6 @@ if cfg.is_logging:
     handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
     logger.addHandler(handler)
 
-client = discord.Client()
-
 
 @client.event
 async def on_message(message):
@@ -26,7 +24,7 @@ async def on_message(message):
         await message.channel.send("asu")  # If the user says !hello we will send back hi
 
     if message.content.startswith("!audio-dl"):
-        client_app = app_downloader.AppUtil()
+        client_app = client_downloader
         try:
             client_app.getAudio(app_tool.get_url_from_message(message))
             await message.channel.send('Download is complete O.o')
@@ -34,7 +32,7 @@ async def on_message(message):
             await message.channel.send('Something is wrong')
 
     if message.content.startswith("!video-dl"):
-        client_app = app_downloader.AppUtil()
+        client_app = client_downloader
         try:
             client_app.getVideo(app_tool.get_url_from_message(message))
             await message.channel.send('Download is complete o.O')
@@ -42,7 +40,7 @@ async def on_message(message):
             await message.channel.send('Something is wrong')
 
     if message.content.startswith("!todo all"):
-        client_app = app_todoist.todoist_app()
+        client_app = client_todoist
         try:
             tasks_all = client_app.getAllTask()
             await message.channel.send(
@@ -51,16 +49,19 @@ async def on_message(message):
             await message.channel.send('failed')
 
     if message.content.startswith("!todo today"):
-        client_app = app_todoist.todoist_app()
+        client_app = client_todoist
         tasks_today = client_app.getTodayTask()
         await message.channel.send(
             "\n".join(["{}. {}".format(i, task['content']) for i, task in enumerate(tasks_today)]))
 
     if message.content.startswith("!todo future"):
-        client_app = app_todoist.todoist_app()
+        client_app = client_todoist
         tasks_future = client_app.getFutureTask()
         await message.channel.send(
             "\n".join(["{}. {}".format(i, task['content']) for i, task in enumerate(tasks_future)]))
 
 
+client_todoist = app_todoist.todoist_app(cfg.YOUR_TODOIST_TOKEN)
+client_downloader = app_downloader.AppUtil()
+client = discord.Client()
 client.run(cfg.YOUR_DISCORD_TOKEN)

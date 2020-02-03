@@ -1,20 +1,19 @@
 from datetime import datetime
 from todoist.api import TodoistAPI
-import database_config as cfg
 
 
 class todoist_app:
 
+    def __init__(self, token):
+        self.api = TodoistAPI(token)
+        self.api.sync()
+
     def getAllProject(self):
-        api = TodoistAPI(cfg.YOUR_TODOIST_TOKEN)
-        api.sync()
-        return api.state['projects']
+        return self.api.state['projects']
 
     def getAllTask(self):
         tasks_all = []
-        api = TodoistAPI(cfg.YOUR_TODOIST_TOKEN)
-        api.sync()
-        items = api.state['items']
+        items = self.api.state['items']
         for item in items:
             # d_task[item['id']] = item['content']
             tasks_all.append(item)
@@ -22,12 +21,10 @@ class todoist_app:
 
     def getTodayTask(self):
         tasks_today = []
-        api = TodoistAPI(cfg.YOUR_TODOIST_TOKEN)
-        api.sync()
 
         # Get "today", only keep Day XX Mon, which Todoist uses
         today = datetime.today().strftime("%Y-%m-%d")
-        for item in api['items']:
+        for item in self.api['items']:
             due = item['due']['date']
             if due:
                 # Slicing :10 gives us the relevant parts
@@ -38,12 +35,10 @@ class todoist_app:
 
     def getFutureTask(self):
         tasks_future = []
-        api = TodoistAPI(cfg.YOUR_TODOIST_TOKEN)
-        api.sync()
 
         # Get "today", only keep Day XX Mon, which Todoist uses
         today = datetime.today().strftime("%Y-%m-%d")
-        for item in api['items']:
+        for item in self.api['items']:
             due = item['due']['date']
             if due:
                 # Slicing :10 gives us the relevant parts
