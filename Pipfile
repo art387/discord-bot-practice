@@ -8,6 +8,10 @@ verify_ssl = true
 [packages]
 discord = "*"
 flask = "*"
+apscheduler = "*"
+beautifultable = "*"
+tabulate = "*"
+pipfile = "*"
 
 [requires]
 python_version = "3.7"
