@@ -9,13 +9,26 @@ from tabulate import tabulate
 class Todoist(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.current_task = []
-        self.api = TodoistAPI(cfg.YOUR_TODOIST_TOKEN)
-        self.api.sync()
-        self.scheduler_todo_today.start()
+        self.current_tasks = None
+        self.current_ctx = None
+        self.current_command = 'today'
 
-    def resync_todoist(self):
-        self.api.sync()
+        try:
+            self.api = TodoistAPI(cfg.YOUR_TODOIST_TOKEN)
+            self.api.sync()
+            self.scheduler_todo_today.start()
+        except Exception as e:
+            print(e)
+
+    async def table_print(self, tasks_list, ctx=None):
+        if not tasks_list:
+            return "No Schedule"
+        table = list()
+        for i, task in enumerate(tasks_list):
+            table.append([i + 1, task['content']])
+        print(tabulate(table, headers=["No", "Task"]))
+        await ctx.send('Here is your uncompleted schedule for today, <@%s>!' % cfg.YOUR_DISCORD_USER_ID +
+                       '\n' + tabulate(table, headers=["No", "Task"]))
 
     @tasks.loop(minutes=30)
     async def scheduler_todo_today(self):
@@ -32,7 +45,9 @@ class Todoist(commands.Cog):
 
     @commands.command()
     async def todo(self, ctx, arg1, arg2=None):
+        # use double " to pass a string argument
         if arg1 == 'today' or arg1 == 'future' or arg1 == 'all':
+            self.current_ctx = ctx
             tasks_list = []
             if arg1 == 'today':
                 tasks_list = self.get_today_task()
@@ -40,22 +55,26 @@ class Todoist(commands.Cog):
                 tasks_list = self.get_future_task()
             elif arg1 == 'all':
                 tasks_list = self.get_all_task()
-            if tasks_list != "Something wrong is happening, please check!":
-                table = list()
-                for i, task in enumerate(tasks_list):
-                    table.append([i + 1, task['content']])
-                print(tabulate(table, headers=["No", "Task"]))
-                await ctx.send('Here is your uncompleted schedule for today, <@%s>!' % cfg.YOUR_DISCORD_USER_ID +
-                               '\n' + tabulate(table, headers=["No", "Task"]))
-            else:
-                await ctx.send("Something wrong is happening, please check!")
+            await self.table_print(tasks_list, ctx)
         elif arg1 == 'do':
             response = self.set_task_complete(arg2)
             await ctx.send(response)
         elif arg1 == 'project':
             self.get_all_project()
+        # elif arg1 == 'add':
+        #     await ctx.send(self.add_item(arg2))
         else:
             await ctx.send('Boo, wrong command!')
+
+    def add_item(self, argument):
+        try:
+            item = self.api.items.add(argument)
+            self.api.commit()
+            self.api.sync()
+            return "Add item success"
+        except Exception as e:
+            print(e)
+            return "Commit failed"
 
     def get_all_project(self):
         return self.api.state['projects']
@@ -67,7 +86,8 @@ class Todoist(commands.Cog):
             for item in items:
                 # d_task[item['id']] = item['content']
                 tasks_all.append(item)
-            self.current_task = tasks_all
+            self.current_tasks = tasks_all
+            self.current_command = 'all'
             return tasks_all
         except Exception as e:
             print(e)
@@ -75,6 +95,8 @@ class Todoist(commands.Cog):
 
     def get_today_task(self):
         try:
+            self.api = TodoistAPI(cfg.YOUR_TODOIST_TOKEN)
+            self.api.sync()
             tasks_today_uncompleted = []
             # Get "today", only keep Day XX Mon, which Todoist uses
             today = datetime.today().strftime("%Y-%m-%d")
@@ -85,7 +107,8 @@ class Todoist(commands.Cog):
                     # Slicing :10 gives us the relevant parts
                     if due[:10] <= today and item.data['checked'] == 0:
                         tasks_today_uncompleted.append(item)
-            self.current_task = tasks_today_uncompleted
+            self.current_tasks = tasks_today_uncompleted
+            self.current_command = 'today'
             return tasks_today_uncompleted
         except Exception as e:
             print(e)
@@ -93,6 +116,8 @@ class Todoist(commands.Cog):
 
     def get_future_task(self):
         try:
+            self.api = TodoistAPI(cfg.YOUR_TODOIST_TOKEN)
+            self.api.sync()
             tasks_future = []
             today = datetime.today().strftime("%Y-%m-%d")
             for item in self.api.state['items']:
@@ -101,7 +126,8 @@ class Todoist(commands.Cog):
                     # Slicing :10 gives us the relevant parts
                     if due[:10] > today and item.data['checked'] == 0:
                         tasks_future.append(item)
-            self.current_task = tasks_future
+            self.current_tasks = tasks_future
+            self.current_command = 'future'
             return tasks_future
         except Exception as e:
             print(e)
@@ -109,12 +135,24 @@ class Todoist(commands.Cog):
 
     def set_task_complete(self, id_content):
         try:
-            task = self.current_task[int(id_content) - 1]
-            task_id = task.data["id"]
-            item = self.api.items.get_by_id(task_id)
-            item.close()
-            self.api.commit()
+            self.api = TodoistAPI(cfg.YOUR_TODOIST_TOKEN)
             self.api.sync()
+
+            for curr_id in id_content.split():
+                task = self.current_tasks[int(curr_id) - 1]
+                task_id = task.data["id"]
+                item = self.api.items.get_by_id(task_id)
+                item.close()
+            self.api.commit()
+            tasks_list = []
+            if self.current_command == 'today':
+                tasks_list = self.get_today_task()
+            elif self.current_command == 'future':
+                tasks_list = self.get_future_task()
+            elif self.current_command == 'all':
+                tasks_list = self.get_all_task()
+            # self.table_print(tasks_list, self.current_ctx)
+
             return "Commit Success"
         except Exception as e:
             print(e)
