@@ -1,4 +1,6 @@
 from datetime import datetime
+
+from discord.ext.commands import bot
 from todoist.api import TodoistAPI
 from discord.ext import tasks, commands
 
@@ -20,32 +22,31 @@ class Todoist(commands.Cog):
         except Exception as e:
             print(e)
 
-    async def table_print(self, tasks_list, ctx=None):
+    def table_print(self, tasks_list, current_command=None):
+        if not current_command:
+            current_command = self.current_command
         if not tasks_list:
             return "No Schedule"
         table = list()
         for i, task in enumerate(tasks_list):
             table.append([i + 1, task['content']])
-        print(tabulate(table, headers=["No", "Task"]))
-        await ctx.send('Here is your uncompleted schedule for today, <@%s>!' % cfg.YOUR_DISCORD_USER_ID +
-                       '\n' + tabulate(table, headers=["No", "Task"]))
+        response = (tabulate(table, headers=["No", "Task"]))
+        return "Here is your uncompleted schedule for {}, <@{}>!".format(current_command,
+                                                                         cfg.YOUR_DISCORD_USER_ID) + '\n' + response
 
     @tasks.loop(minutes=30)
     async def scheduler_todo_today(self):
         await self.bot.wait_until_ready()
-        table = list()
         tasks_list = self.get_today_task()
         if tasks_list:
             ch = self.bot.get_channel(cfg.YOUR_DISCORD_CHANNEL)
-            for i, task in enumerate(tasks_list):
-                table.append([i + 1, task['content']])
-            print(tabulate(table, headers=["No", "Task"]))
-            await ch.send('Here is your uncompleted schedule for today, <@%s>!' % cfg.YOUR_DISCORD_USER_ID +
-                          '\n' + tabulate(table, headers=["No", "Task"]))
+            response = self.table_print(tasks_list, 'today')
+            await ch.send(response)
 
     @commands.command()
     async def todo(self, ctx, arg1, arg2=None):
         # use double " to pass a string argument
+        response = ""
         if arg1 == 'today' or arg1 == 'future' or arg1 == 'all':
             self.current_ctx = ctx
             tasks_list = []
@@ -55,17 +56,23 @@ class Todoist(commands.Cog):
                 tasks_list = self.get_future_task()
             elif arg1 == 'all':
                 tasks_list = self.get_all_task()
-            await self.table_print(tasks_list, ctx)
+            response = self.table_print(tasks_list)
         elif arg1 == 'do':
             response = self.set_task_complete(arg2)
-            await ctx.send(response)
         elif arg1 == 'project':
             self.get_all_project()
+            response = 'boo'
         # elif arg1 == 'add':
         #     await ctx.send(self.add_item(arg2))
         else:
-            await ctx.send('Boo, wrong command!')
+            response = 'Boo, wrong command!'
 
+        try:
+            await ctx.send(response)
+        except Exception as e:
+            print(e)
+
+    # TODO: Fix the add item on todoist API
     def add_item(self, argument):
         try:
             item = self.api.items.add(argument)
@@ -135,6 +142,7 @@ class Todoist(commands.Cog):
 
     def set_task_complete(self, id_content):
         try:
+
             self.api = TodoistAPI(cfg.YOUR_TODOIST_TOKEN)
             self.api.sync()
 
@@ -144,6 +152,7 @@ class Todoist(commands.Cog):
                 item = self.api.items.get_by_id(task_id)
                 item.close()
             self.api.commit()
+
             tasks_list = []
             if self.current_command == 'today':
                 tasks_list = self.get_today_task()
@@ -151,9 +160,10 @@ class Todoist(commands.Cog):
                 tasks_list = self.get_future_task()
             elif self.current_command == 'all':
                 tasks_list = self.get_all_task()
-            # self.table_print(tasks_list, self.current_ctx)
+            response = self.table_print(tasks_list)
 
-            return "Commit Success"
+            return 'Commit Success' + '\n' + response
+
         except Exception as e:
             print(e)
             return "Something wrong is happening, please check!"
